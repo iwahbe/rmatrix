@@ -34,6 +34,13 @@ fn main() -> std::io::Result<()> {
                 .long("end")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("reverse")
+                .short("r")
+                .help("Reverses direction")
+                .long("reverse")
+                .takes_value(false),
+        )
         .get_matches();
     // variable setup
     let end_color: &dyn color::Color = match &command_args.args.get("end_color") {
@@ -56,12 +63,14 @@ fn main() -> std::io::Result<()> {
         },
         None => &color::Blue,
     };
+
+    let reverse = &command_args.args.get("reverse").is_some();
     // main loop
     let mut stdout = stdout().into_raw_mode().unwrap();
     let mut stdin = async_stdin().keys();
 
     loop {
-        match hot_loop(&mut stdin, &mut stdout, &main_color, &end_color)? {
+        match hot_loop(&mut stdin, &mut stdout, &main_color, &end_color, *reverse)? {
             ExitReason::Quite => break,
             ExitReason::SizeChange => thread::sleep(time::Duration::from_secs_f32(0.1)),
         }
@@ -87,12 +96,13 @@ fn hot_loop(
     mut stdout: &mut dyn Write,
     main_color: &dyn color::Color,
     second_color: &dyn color::Color,
+    reverse: bool,
 ) -> std::io::Result<ExitReason> {
     let (x_size, y_size) = termion::terminal_size()?;
     write!(stdout, "{}{}", cursor::Hide, clear::All)?;
     let mut columns: Vec<Column> = (1..x_size)
         .into_iter()
-        .map(|c| Column::new(c, y_size))
+        .map(|c| Column::new(c, y_size, reverse))
         .collect();
     // main loop initialize
     write!(stdout, "{}{}", cursor::Hide, clear::All)?;
@@ -123,17 +133,19 @@ struct Column {
     column: u16,
     last_made: char,
     delay: u16,
+    reverse: bool,
 }
 
 impl Column {
-    fn new(column: u16, max_height: u16) -> Self {
+    fn new(column: u16, max_height: u16, rev: bool) -> Self {
         Self {
-            start: 0,
-            end: 0,
+            start: if !rev { 0 } else { max_height },
+            end: if !rev { 0 } else { max_height },
             max_height: max_height,
             column: column,
             last_made: ' ',
             delay: Uniform::new_inclusive(0, 150).sample(&mut rand::thread_rng()),
+            reverse: rev,
         }
     }
     fn update<T: Write>(
@@ -144,19 +156,27 @@ impl Column {
     ) -> std::io::Result<()> {
         if self.delay == 0 {
             let action = Uniform::new_inclusive(0, 2).sample(&mut rand::thread_rng());
-            if self.max_height != self.end && self.max_height != self.start {
+            if (!self.reverse && self.max_height != self.end && self.max_height != self.start)
+                || (self.reverse && 0 != self.end && 0 != self.start)
+            {
                 if action == 1 || action == 2 {
                     self.add_last_char(writer, c1, c2)?;
                 }
                 if action == 2 || action == 3 {
                     self.delete_first_char(writer)?;
                 }
-            } else if self.max_height == self.end && self.end == self.start {
+            } else if ((!self.reverse && self.max_height == self.end)
+                || (self.reverse && 0 == self.end))
+                && self.end == self.start
+            {
                 // finished column
-                self.start = 0;
-                self.end = 0;
+                let new = if !self.reverse { 0 } else { self.max_height };
+                self.start = new;
+                self.end = new;
                 self.delay = Uniform::new_inclusive(0, 100).sample(&mut rand::thread_rng());
-            } else if self.max_height == self.end {
+            } else if (!self.reverse && self.max_height == self.end)
+                || (self.reverse && 0 == self.end)
+            {
                 // finishing up column
                 self.delete_first_char(writer)?;
                 self.fix_last_char(writer, c1)?;
@@ -177,7 +197,11 @@ impl Column {
             goto = cursor::Goto(self.column, self.start),
             space = " "
         )?;
-        self.start += 1;
+        if !self.reverse {
+            self.start += 1;
+        } else {
+            self.start -= 1;
+        };
         Ok(())
     }
 
@@ -185,7 +209,7 @@ impl Column {
         write!(
             writer,
             "{goto} ",
-            goto = cursor::Goto(self.column, self.max_height),
+            goto = cursor::Goto(self.column, if !self.reverse { self.max_height } else { 0 }),
         )?;
         Ok(())
     }
@@ -198,7 +222,11 @@ impl Column {
     ) -> std::io::Result<()> {
         // fix color of old char
         self.fix_last_char(writer, c1)?;
-        self.end += 1;
+        if self.reverse == false {
+            self.end += 1;
+        } else {
+            self.end -= 1;
+        };
         // create new char at end
         self.last_made = random_char();
         write!(
