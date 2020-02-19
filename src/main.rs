@@ -54,7 +54,7 @@ fn main() -> std::io::Result<()> {
                 return Ok(());
             }
         },
-        None => &color::White,
+        None => &color::Blue,
     };
     // main loop
     let mut stdout = stdout().into_raw_mode().unwrap();
@@ -159,10 +159,11 @@ impl Column {
             } else if self.max_height == self.end {
                 // finishing up column
                 self.delete_first_char(writer)?;
+                self.fix_last_char(writer, c1)?;
             }
         } else {
-            self.delete_last_char(writer)?;
             self.delay -= 1;
+            self.delete_last_char(writer)?;
         }
 
         Ok(())
@@ -196,14 +197,7 @@ impl Column {
         c2: &dyn color::Color,
     ) -> std::io::Result<()> {
         // fix color of old char
-        write!(
-            writer,
-            "{color}{goto}{c}{reset}",
-            color = color::Fg(c1),
-            goto = cursor::Goto(self.column, self.end),
-            c = self.last_made,
-            reset = color::Fg(color::Reset),
-        )?;
+        self.fix_last_char(writer, c1)?;
         self.end += 1;
         // create new char at end
         self.last_made = random_char();
@@ -213,6 +207,22 @@ impl Column {
             color = color::Fg(c2),
             goto = cursor::Goto(self.column, self.end),
             rand = self.last_made,
+            reset = color::Fg(color::Reset),
+        )?;
+        Ok(())
+    }
+
+    fn fix_last_char<T: Write>(
+        &mut self,
+        writer: &mut T,
+        c1: &dyn color::Color,
+    ) -> std::io::Result<()> {
+        write!(
+            writer,
+            "{color}{goto}{c}{reset}",
+            color = color::Fg(c1),
+            goto = cursor::Goto(self.column, self.end),
+            c = self.last_made,
             reset = color::Fg(color::Reset),
         )?;
         Ok(())
