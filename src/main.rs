@@ -41,6 +41,13 @@ fn main() -> std::io::Result<()> {
                 .long("reverse")
                 .takes_value(false),
         )
+        .arg(
+            Arg::with_name("horizontal")
+                .short("h")
+                .help("Changes orientation")
+                .long("horizontal")
+                .takes_value(false),
+        )
         .get_matches();
     // variable setup
     let end_color: &dyn color::Color = match &command_args.args.get("end_color") {
@@ -64,13 +71,21 @@ fn main() -> std::io::Result<()> {
         None => &color::Blue,
     };
 
-    let reverse = &command_args.args.get("reverse").is_some();
+    let reverse = command_args.args.get("reverse").is_some();
+    let horizontal = command_args.args.get("horizontal").is_some();
     // main loop
     let mut stdout = stdout().into_raw_mode().unwrap();
     let mut stdin = async_stdin().keys();
 
     loop {
-        match hot_loop(&mut stdin, &mut stdout, &main_color, &end_color, *reverse)? {
+        match hot_loop(
+            &mut stdin,
+            &mut stdout,
+            &main_color,
+            &end_color,
+            reverse,
+            horizontal,
+        )? {
             ExitReason::Quite => break,
             ExitReason::SizeChange => thread::sleep(time::Duration::from_secs_f32(0.1)),
         }
@@ -97,13 +112,25 @@ fn hot_loop(
     main_color: &dyn color::Color,
     second_color: &dyn color::Color,
     reverse: bool,
+    horizontal: bool,
 ) -> std::io::Result<ExitReason> {
     let (x_size, y_size) = termion::terminal_size()?;
     write!(stdout, "{}{}", cursor::Hide, clear::All)?;
-    let mut columns: Vec<Column> = (1..x_size)
-        .into_iter()
-        .map(|c| Column::new(c, y_size, reverse))
-        .collect();
+    let mut columns: Vec<Column> = if !horizontal {
+        1..x_size
+    } else {
+        0..y_size + 1
+    }
+    .into_iter()
+    .map(|c| {
+        Column::new(
+            c,
+            if !horizontal { y_size } else { x_size },
+            reverse,
+            horizontal,
+        )
+    })
+    .collect();
     // main loop initialize
     write!(stdout, "{}{}", cursor::Hide, clear::All)?;
     // main loop
@@ -121,8 +148,9 @@ fn hot_loop(
         for c in &mut columns {
             c.update(&mut stdout, main_color, second_color)?;
         }
-
-        thread::sleep(time::Duration::from_secs_f32(0.05));
+        thread::sleep(time::Duration::from_secs_f32(
+            if horizontal { 0.5 } else { 1.0 } * 0.05,
+        ));
     }
 }
 
@@ -134,18 +162,29 @@ struct Column {
     last_made: char,
     delay: u16,
     reverse: bool,
+    horizontal: bool,
 }
 
 impl Column {
-    fn new(column: u16, max_height: u16, rev: bool) -> Self {
+    fn new(column: u16, max_height: u16, rev: bool, horizontal: bool) -> Self {
         Self {
-            start: if !rev { 0 } else { max_height },
-            end: if !rev { 0 } else { max_height },
+            start: if !rev {
+                0 + horizontal as u16
+            } else {
+                max_height
+            },
+            end: if !rev {
+                0 + horizontal as u16
+            } else {
+                max_height
+            },
             max_height: max_height,
             column: column,
             last_made: ' ',
-            delay: Uniform::new_inclusive(0, 150).sample(&mut rand::thread_rng()),
+            delay: Uniform::new_inclusive(0, if !horizontal { 150 } else { 300 })
+                .sample(&mut rand::thread_rng()),
             reverse: rev,
+            horizontal: horizontal,
         }
     }
     fn update<T: Write>(
@@ -156,8 +195,9 @@ impl Column {
     ) -> std::io::Result<()> {
         if self.delay == 0 {
             let action = Uniform::new_inclusive(0, 2).sample(&mut rand::thread_rng());
+            let lowest = if !self.horizontal { 0 } else { 1 };
             if (!self.reverse && self.max_height != self.end && self.max_height != self.start)
-                || (self.reverse && 0 != self.end && 0 != self.start)
+                || (self.reverse && lowest != self.end && lowest != self.start)
             {
                 if action == 1 || action == 2 {
                     self.add_last_char(writer, c1, c2)?;
@@ -166,16 +206,20 @@ impl Column {
                     self.delete_first_char(writer)?;
                 }
             } else if ((!self.reverse && self.max_height == self.end)
-                || (self.reverse && 0 == self.end))
+                || (self.reverse && lowest == self.end))
                 && self.end == self.start
             {
                 // finished column
-                let new = if !self.reverse { 0 } else { self.max_height };
+                let new = if !self.reverse {
+                    lowest
+                } else {
+                    self.max_height
+                };
                 self.start = new;
                 self.end = new;
                 self.delay = Uniform::new_inclusive(0, 100).sample(&mut rand::thread_rng());
             } else if (!self.reverse && self.max_height == self.end)
-                || (self.reverse && 0 == self.end)
+                || (self.reverse && lowest == self.end)
             {
                 // finishing up column
                 self.delete_first_char(writer)?;
@@ -194,7 +238,11 @@ impl Column {
         write!(
             writer,
             "{goto}{space}",
-            goto = cursor::Goto(self.column, self.start),
+            goto = if !self.horizontal {
+                cursor::Goto(self.column, self.start)
+            } else {
+                cursor::Goto(self.start, self.column)
+            },
             space = " "
         )?;
         if !self.reverse {
@@ -206,10 +254,29 @@ impl Column {
     }
 
     fn delete_last_char<T: Write>(&mut self, writer: &mut T) -> std::io::Result<()> {
+        let lowest = if self.horizontal { 1 } else { 0 };
         write!(
             writer,
             "{goto} ",
-            goto = cursor::Goto(self.column, if !self.reverse { self.max_height } else { 0 }),
+            goto = if !self.horizontal {
+                cursor::Goto(
+                    self.column,
+                    if !self.reverse {
+                        self.max_height
+                    } else {
+                        lowest
+                    },
+                )
+            } else {
+                cursor::Goto(
+                    if !self.reverse {
+                        self.max_height
+                    } else {
+                        lowest
+                    },
+                    self.column,
+                )
+            },
         )?;
         Ok(())
     }
@@ -233,7 +300,11 @@ impl Column {
             writer,
             "{color}{goto}{rand}{reset}",
             color = color::Fg(c2),
-            goto = cursor::Goto(self.column, self.end),
+            goto = if !self.horizontal {
+                cursor::Goto(self.column, self.end)
+            } else {
+                cursor::Goto(self.end, self.column)
+            },
             rand = self.last_made,
             reset = color::Fg(color::Reset),
         )?;
@@ -249,7 +320,11 @@ impl Column {
             writer,
             "{color}{goto}{c}{reset}",
             color = color::Fg(c1),
-            goto = cursor::Goto(self.column, self.end),
+            goto = if !self.horizontal {
+                cursor::Goto(self.column, self.end)
+            } else {
+                cursor::Goto(self.end, self.column)
+            },
             c = self.last_made,
             reset = color::Fg(color::Reset),
         )?;
