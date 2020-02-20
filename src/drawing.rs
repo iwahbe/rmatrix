@@ -1,4 +1,5 @@
 struct Digit(Vec<&'static str>);
+use std::collections::HashSet;
 use std::io::Write;
 use termion::cursor;
 
@@ -312,12 +313,12 @@ pub struct Size {
 
 pub trait Draw {
     fn size(&self) -> Size;
-    fn draw(&self, writer: &mut dyn Write, x: u16, y: u16) -> std::io::Result<()>;
+    fn draw(&self, writer: &mut dyn Write, x: u16, y: u16) -> std::io::Result<HashSet<(u16, u16)>>;
 }
 
 impl Draw for Numbers {
     fn size(&self) -> Size { self.size }
-    fn draw(&self, writer: &mut dyn Write, x: u16, y: u16) -> std::io::Result<()> {
+    fn draw(&self, writer: &mut dyn Write, x: u16, y: u16) -> std::io::Result<HashSet<(u16, u16)>> {
         for row in 0..(Digit::one().0).0.len() {
             write!(writer, "{}", cursor::Goto(x, y + row as u16))?;
             for digit in self.digits.char_indices() {
@@ -347,7 +348,7 @@ impl Draw for Numbers {
                 }
             }
         }
-        Ok(())
+        Ok(HashSet::new())
     }
 }
 
@@ -364,27 +365,34 @@ impl Draw for Frame {
             width: inner.width + 2,
         }
     }
-    fn draw(&self, writer: &mut dyn Write, x: u16, y: u16) -> std::io::Result<()> {
+    fn draw(&self, writer: &mut dyn Write, x: u16, y: u16) -> std::io::Result<HashSet<(u16, u16)>> {
         write!(writer, "{}", cursor::Goto(x, y))?;
         let size = self.size();
-        for _ in 0..size.width {
+        for _ in 0..size.width - 2 {
             write!(writer, "{}", self.material)?;
         }
-        for y0 in y..y + size.height + 1 {
+        for y0 in y..y + size.height {
             write!(
                 writer,
                 "{g1}{m}{g2}{m}",
                 g1 = cursor::Goto(x, y0),
-                g2 = cursor::Goto(x + size.width, y0),
+                g2 = cursor::Goto(x + size.width - 2, y0),
                 m = self.material
             )?;
         }
         write!(writer, "{}", cursor::Goto(x, y + size.height))?;
-        for _ in 0..self.size().width {
+        for _ in 0..self.size().width - 1 {
             write!(writer, "{}", self.material)?;
         }
-        self.inner.draw(writer, x + 1, y + 1)?;
-        Ok(())
+        let inner_hitbox = self.inner.draw(writer, x + 1, y + 1)?;
+        let mut taken = HashSet::new();
+        for xdelta in 0..size.width - 2 {
+            for ydelta in 0..size.height + 2 {
+                taken.insert((x + xdelta, y + ydelta - 1));
+            }
+        }
+        taken.extend(inner_hitbox);
+        Ok(taken)
     }
 }
 

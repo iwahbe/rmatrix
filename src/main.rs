@@ -127,17 +127,9 @@ fn hot_loop(
     second_color: &dyn color::Color,
     reverse: bool,
     horizontal: bool,
-    is_clock: bool,
+    clock: bool,
 ) -> std::io::Result<ExitReason> {
     let (x_size, y_size) = termion::terminal_size()?;
-    let mut forbidden = (|| {
-        let mut out = HashSet::new();
-        for x in vec![(5, 5), (5, 6), (6, 5), (6, 6)].into_iter() {
-            out.insert(x);
-        }
-        out
-    })();
-    forbidden.insert((5, 5));
     write!(stdout, "{}{}", cursor::Hide, clear::All)?;
     let mut columns: Vec<Column> = if !horizontal {
         1..x_size
@@ -151,20 +143,9 @@ fn hot_loop(
             if !horizontal { y_size } else { x_size },
             reverse,
             horizontal,
-            &forbidden,
         )
     })
     .collect();
-    let mut clock;
-    if is_clock {
-        let raw_clock = Box::new(Numbers::from(&format!(
-            "{}",
-            Local::now().format("%I:%M%p")
-        )));
-        clock = Some(Frame::from('#', Box::new(Frame::from(' ', raw_clock))));
-    } else {
-        clock = None;
-    }
     // main loop initialize
     write!(stdout, "{}{}", cursor::Hide, clear::All)?;
     // main loop
@@ -178,12 +159,9 @@ fn hot_loop(
                 _ => {}
             }
         }
-        for c in &mut columns {
-            c.update(&mut stdout, main_color, second_color)?;
-        }
-        if let Some(c) = clock {
-            c.draw(&mut stdout, 3, 2)?;
-            clock = Some(Frame::from(
+        let forbidden;
+        if clock {
+            forbidden = Frame::from(
                 '#',
                 Box::new(Frame::from(
                     ' ',
@@ -192,16 +170,23 @@ fn hot_loop(
                         Local::now().format("%I:%M%p")
                     ))),
                 )),
-            ));
+            )
+            .draw(&mut stdout, 1, 1)?;
+        } else {
+            forbidden = HashSet::new();
         }
         stdout.flush()?;
         thread::sleep(time::Duration::from_secs_f32(
             if horizontal { 0.5 } else { 1.0 } * 0.05,
         ));
+
+        for c in &mut columns {
+            c.update(&mut stdout, main_color, second_color, &forbidden)?;
+        }
     }
 }
 
-struct Column<'a> {
+struct Column {
     start: u16,
     end: u16,
     max_height: u16,
@@ -210,17 +195,10 @@ struct Column<'a> {
     delay: u16,
     reverse: bool,
     horizontal: bool,
-    forbidden: &'a HashSet<(u16, u16)>,
 }
 
-impl<'a> Column<'a> {
-    fn new(
-        column: u16,
-        max_height: u16,
-        rev: bool,
-        horizontal: bool,
-        forbidden: &'a HashSet<(u16, u16)>,
-    ) -> Self {
+impl Column {
+    fn new(column: u16, max_height: u16, rev: bool, horizontal: bool) -> Self {
         Self {
             start: if !rev {
                 0 + horizontal as u16
@@ -239,7 +217,6 @@ impl<'a> Column<'a> {
                 .sample(&mut rand::thread_rng()),
             reverse: rev,
             horizontal: horizontal,
-            forbidden: forbidden,
         }
     }
     fn update<T: Write>(
@@ -247,6 +224,7 @@ impl<'a> Column<'a> {
         writer: &mut T,
         c1: &dyn color::Color,
         c2: &dyn color::Color,
+        forbidden: &HashSet<(u16, u16)>,
     ) -> std::io::Result<()> {
         if self.delay == 0 {
             let action = Uniform::new_inclusive(0, 2).sample(&mut rand::thread_rng());
@@ -255,10 +233,10 @@ impl<'a> Column<'a> {
                 || (self.reverse && lowest != self.end && lowest != self.start)
             {
                 if action == 1 || action == 2 {
-                    self.add_last_char(writer, c1, c2)?;
+                    self.add_last_char(writer, c1, c2, forbidden)?;
                 }
                 if action == 2 || action == 3 {
-                    self.delete_first_char(writer)?;
+                    self.delete_first_char(writer, forbidden)?;
                 }
             } else if ((!self.reverse && self.max_height == self.end)
                 || (self.reverse && lowest == self.end))
@@ -277,25 +255,29 @@ impl<'a> Column<'a> {
                 || (self.reverse && lowest == self.end)
             {
                 // finishing up column
-                self.delete_first_char(writer)?;
-                self.fix_last_char(writer, c1)?;
+                self.delete_first_char(writer, forbidden)?;
+                self.fix_last_char(writer, c1, forbidden)?;
             }
         } else {
             self.delay -= 1;
-            self.delete_last_char(writer)?;
+            self.delete_last_char(writer, forbidden)?;
         }
 
         Ok(())
     }
 
-    fn delete_first_char<T: Write>(&mut self, writer: &mut T) -> std::io::Result<()> {
+    fn delete_first_char<T: Write>(
+        &mut self,
+        writer: &mut T,
+        forbidden: &HashSet<(u16, u16)>,
+    ) -> std::io::Result<()> {
         // delete last char created
         let pair = if !self.horizontal {
             (self.column, self.start)
         } else {
             (self.start, self.column)
         };
-        if self.forbidden.contains(&pair) {
+        if forbidden.contains(&pair) {
         } else {
             write!(
                 writer,
@@ -312,7 +294,11 @@ impl<'a> Column<'a> {
         Ok(())
     }
 
-    fn delete_last_char<T: Write>(&mut self, writer: &mut T) -> std::io::Result<()> {
+    fn delete_last_char<T: Write>(
+        &mut self,
+        writer: &mut T,
+        forbidden: &HashSet<(u16, u16)>,
+    ) -> std::io::Result<()> {
         let lowest = if self.horizontal { 1 } else { 0 };
         let pair = if !self.horizontal {
             (
@@ -333,7 +319,7 @@ impl<'a> Column<'a> {
                 self.column,
             )
         };
-        if self.forbidden.contains(&pair) {
+        if forbidden.contains(&pair) {
         } else {
             write!(writer, "{goto} ", goto = cursor::Goto(pair.0, pair.1))?;
         }
@@ -345,9 +331,10 @@ impl<'a> Column<'a> {
         writer: &mut T,
         c1: &dyn color::Color,
         c2: &dyn color::Color,
+        forbidden: &HashSet<(u16, u16)>,
     ) -> std::io::Result<()> {
         // fix color of old char
-        self.fix_last_char(writer, c1)?;
+        self.fix_last_char(writer, c1, forbidden)?;
         if self.reverse == false {
             self.end += 1;
         } else {
@@ -358,7 +345,7 @@ impl<'a> Column<'a> {
         } else {
             (self.end, self.column)
         };
-        if self.forbidden.contains(&pair) {
+        if forbidden.contains(&pair) {
         } else {
             // create new char at end
             self.last_made = random_char();
@@ -378,13 +365,14 @@ impl<'a> Column<'a> {
         &mut self,
         writer: &mut T,
         c1: &dyn color::Color,
+        forbidden: &HashSet<(u16, u16)>,
     ) -> std::io::Result<()> {
         let pair = if !self.horizontal {
             (self.column, self.end)
         } else {
             (self.end, self.column)
         };
-        if self.forbidden.contains(&pair) {
+        if forbidden.contains(&pair) {
         } else {
             write!(
                 writer,
