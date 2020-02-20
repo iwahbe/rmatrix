@@ -1,7 +1,9 @@
 extern crate clap;
 extern crate rand;
 extern crate termion;
+mod numbers;
 use clap::{App, Arg};
+use numbers::{Draw, Frame, Numbers};
 use rand::{distributions::Uniform, prelude::*};
 use std::io::{stdout, Write};
 use std::{thread, time};
@@ -48,6 +50,12 @@ fn main() -> std::io::Result<()> {
                 .long("horizontal")
                 .takes_value(false),
         )
+        .arg(
+            Arg::with_name("clock")
+                .short("c")
+                .help("Unstable")
+                .takes_value(false),
+        )
         .get_matches();
     // variable setup
     let end_color: &dyn color::Color = match &command_args.args.get("end_color") {
@@ -73,6 +81,7 @@ fn main() -> std::io::Result<()> {
 
     let reverse = command_args.args.get("reverse").is_some();
     let horizontal = command_args.args.get("horizontal").is_some();
+    let clock = command_args.args.get("clock").is_some();
     // main loop
     let mut stdout = stdout().into_raw_mode().unwrap();
     let mut stdin = async_stdin().keys();
@@ -85,11 +94,13 @@ fn main() -> std::io::Result<()> {
             &end_color,
             reverse,
             horizontal,
+            clock,
         )? {
             ExitReason::Quite => break,
             ExitReason::SizeChange => thread::sleep(time::Duration::from_secs_f32(0.1)),
         }
     }
+
     // cleanup, needed to return to normal state
     write!(
         stdout,
@@ -113,6 +124,7 @@ fn hot_loop(
     second_color: &dyn color::Color,
     reverse: bool,
     horizontal: bool,
+    is_clock: bool,
 ) -> std::io::Result<ExitReason> {
     let (x_size, y_size) = termion::terminal_size()?;
     write!(stdout, "{}{}", cursor::Hide, clear::All)?;
@@ -131,6 +143,15 @@ fn hot_loop(
         )
     })
     .collect();
+    let clock;
+    if is_clock {
+        clock = Some(Frame::from(
+            '#',
+            Box::new(Frame::from(' ', Box::new(Numbers::from("4:20AM")))),
+        ));
+    } else {
+        clock = None;
+    }
     // main loop initialize
     write!(stdout, "{}{}", cursor::Hide, clear::All)?;
     // main loop
@@ -147,6 +168,9 @@ fn hot_loop(
         stdout.flush()?;
         for c in &mut columns {
             c.update(&mut stdout, main_color, second_color)?;
+        }
+        if let Some(c) = clock.as_ref() {
+            c.draw(&mut stdout, 3, 2)?;
         }
         thread::sleep(time::Duration::from_secs_f32(
             if horizontal { 0.5 } else { 1.0 } * 0.05,
