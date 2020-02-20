@@ -261,8 +261,14 @@ pub struct Numbers {
 impl Numbers {
     pub fn from(digits: &str) -> Self {
         let mut out = Self::new();
-        out.update(digits);
+        out.setup(digits);
         out
+    }
+    pub fn with_min_width(mut self, width: u16) -> Self {
+        if self.size.width < width {
+            self.size.width = width;
+        }
+        self
     }
     fn new() -> Self {
         Self {
@@ -273,7 +279,7 @@ impl Numbers {
             },
         }
     }
-    fn update(&mut self, new: &str) {
+    fn setup(&mut self, new: &str) {
         let mut w = 0;
         let mut h = 0;
         for digit in new.chars() {
@@ -363,6 +369,12 @@ impl Draw for Numbers {
                 taken.insert((x + index, y + row as u16));
                 index += 1;
             }
+            let fix_index = index;
+            for _ in 0..(self.size.width - fix_index as u16) {
+                write!(writer, " ")?;
+                taken.insert((x + index, y + row as u16));
+                index += 1;
+            }
         }
         Ok(taken)
     }
@@ -417,5 +429,84 @@ impl Frame {
             inner: contents,
             material: material,
         }
+    }
+}
+
+pub struct Label {
+    lines: Vec<String>,
+    size: Size,
+}
+
+impl Label {
+    pub fn from(contents: &str) -> Self {
+        let mut size = Size {
+            width: 0,
+            height: 0,
+        };
+        let lines = contents
+            .lines()
+            .map(|x| {
+                size.height += 1;
+                if size.width < x.len() as u16 + 1 {
+                    size.width = x.len() as u16 + 1;
+                }
+
+                x.to_owned()
+            })
+            .collect();
+        size.height -= 1;
+        Self {
+            lines: lines,
+            size: size,
+        }
+    }
+}
+
+impl Draw for Label {
+    fn size(&self) -> Size { self.size }
+    fn draw(&self, writer: &mut dyn Write, x: u16, y: u16) -> std::io::Result<HashSet<(u16, u16)>> {
+        for i in 0..self.lines.len() {
+            write!(
+                writer,
+                "{goto}{line}",
+                goto = cursor::Goto(x, y + i as u16),
+                line = self.lines[i]
+            )?;
+        }
+        Ok(dense_hitbox(x, self.size.width(), y, self.size.height()))
+    }
+}
+
+fn dense_hitbox(x0: u16, x_len: u16, y0: u16, y_len: u16) -> HashSet<(u16, u16)> {
+    let mut taken = HashSet::<(u16, u16)>::new();
+    for x in x0..x0 + x_len {
+        for y in y0..y0 + y_len + 1 {
+            taken.insert((x, y));
+        }
+    }
+    taken
+}
+
+pub struct Blank {
+    size: Size,
+}
+
+impl Blank {
+    pub fn from(mut size: Size) -> Self {
+        size.height += 1;
+        Self { size: size }
+    }
+}
+
+impl Draw for Blank {
+    fn size(&self) -> Size { self.size }
+    fn draw(&self, writer: &mut dyn Write, x: u16, y: u16) -> std::io::Result<HashSet<(u16, u16)>> {
+        for y0 in y..y + self.size.height() {
+            write!(writer, "{}", cursor::Goto(x, y0))?;
+            for _ in x..x + self.size.width() {
+                write!(writer, " ")?;
+            }
+        }
+        Ok(dense_hitbox(x, self.size.width(), y, self.size.height()))
     }
 }

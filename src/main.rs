@@ -5,7 +5,7 @@ extern crate termion;
 use chrono::Local;
 mod drawing;
 use clap::{App, Arg};
-use drawing::{Draw, Frame, Numbers};
+use drawing::{Blank, Draw, Frame, Label, Numbers};
 use rand::{distributions::Uniform, prelude::*};
 use std::collections::HashSet;
 use std::io::{stdout, Write};
@@ -56,8 +56,14 @@ fn main() -> std::io::Result<()> {
         .arg(
             Arg::with_name("clock")
                 .short("c")
-                .help("Unstable")
+                .long("clock")
                 .takes_value(false),
+        )
+        .arg(
+            Arg::with_name("fortune")
+                .long("fortune")
+                .short("f")
+                .help("Displays fortune quotes"),
         )
         .get_matches();
     // variable setup
@@ -85,6 +91,7 @@ fn main() -> std::io::Result<()> {
     let reverse = command_args.args.get("reverse").is_some();
     let horizontal = command_args.args.get("horizontal").is_some();
     let clock = command_args.args.get("clock").is_some();
+    let fortune = command_args.args.get("fortune").is_some();
     // main loop
     let mut stdout = stdout().into_raw_mode().unwrap();
     let mut stdin = async_stdin().keys();
@@ -98,6 +105,7 @@ fn main() -> std::io::Result<()> {
             reverse,
             horizontal,
             clock,
+            fortune,
         )? {
             ExitReason::Quite => break,
             ExitReason::SizeChange => thread::sleep(time::Duration::from_secs_f32(0.1)),
@@ -128,6 +136,7 @@ fn hot_loop(
     reverse: bool,
     horizontal: bool,
     clock: bool,
+    fortune: bool,
 ) -> std::io::Result<ExitReason> {
     let (x_size, y_size) = termion::terminal_size()?;
     write!(stdout, "{}{}", cursor::Hide, clear::All)?;
@@ -146,6 +155,12 @@ fn hot_loop(
         )
     })
     .collect();
+    let mut loop_time = 0;
+    let mut quote: Option<String> = if fortune {
+        Some("foo".to_owned())
+    } else {
+        None
+    };
     // main loop initialize
     write!(stdout, "{}{}", cursor::Hide, clear::All)?;
     // main loop
@@ -159,27 +174,60 @@ fn hot_loop(
                 _ => {}
             }
         }
-        let forbidden;
+        let mut forbidden = HashSet::new();
         if clock {
+            const LENGTH_OF_CLOCK: u16 = 103;
+            let t = format!("{}", Local::now().format("%I:%M:%S%p"));
             let now_clock = Frame::from(
                 '#',
                 Box::new(Frame::from(
                     ' ',
-                    Box::new(Numbers::from(&format!(
-                        "{}",
-                        Local::now().format("%I:%M%p")
-                    ))),
+                    Box::new(Numbers::from(&t).with_min_width(LENGTH_OF_CLOCK)),
                 )),
             );
             let clock_size = now_clock.size();
-            forbidden = now_clock.draw(&mut stdout, 10, y_size - clock_size.height() - 4)?;
-        } else {
-            forbidden = HashSet::new();
+            forbidden.extend(now_clock.draw(&mut stdout, 10, y_size - clock_size.height() - 4)?);
         }
+        if let Some(q) = quote.as_mut() {
+            const Y_DOWN: u16 = 5;
+            if loop_time == 0 {
+                let quote = std::process::Command::new("fortune").output()?;
+                if quote.status.success() {
+                    let old = Blank::from(
+                        Frame::from('#', Box::new(Frame::from(' ', Box::new(Label::from(&q)))))
+                            .size(),
+                    );
+                    forbidden.extend(old.draw(
+                        &mut stdout,
+                        x_size - old.size().width() - 10,
+                        Y_DOWN,
+                    )?);
+                    *q = String::from_utf8_lossy(&quote.stdout).to_string();
+                }
+                let new = Blank::from(
+                    Frame::from('#', Box::new(Frame::from(' ', Box::new(Label::from(&q))))).size(),
+                );
+                forbidden.extend(new.draw(
+                    &mut stdout,
+                    x_size - new.size().width() - 10,
+                    Y_DOWN,
+                )?);
+            } else {
+                let label = Frame::from('#', Box::new(Frame::from(' ', Box::new(Label::from(&q)))));
+                forbidden.extend(label.draw(
+                    &mut stdout,
+                    x_size - label.size().width() - 10,
+                    Y_DOWN,
+                )?);
+            }
+        }
+
         stdout.flush()?;
         thread::sleep(time::Duration::from_secs_f32(
             if horizontal { 0.5 } else { 1.0 } * 0.05,
         ));
+        loop_time += 1;
+        loop_time = loop_time % 100;
 
         for c in &mut columns {
             c.update(&mut stdout, main_color, second_color, &forbidden)?;
