@@ -161,7 +161,7 @@ fn hot_loop(
         }
         let forbidden;
         if clock {
-            forbidden = Frame::from(
+            let now_clock = Frame::from(
                 '#',
                 Box::new(Frame::from(
                     ' ',
@@ -170,8 +170,9 @@ fn hot_loop(
                         Local::now().format("%I:%M%p")
                     ))),
                 )),
-            )
-            .draw(&mut stdout, 1, 1)?;
+            );
+            let clock_size = now_clock.size();
+            forbidden = now_clock.draw(&mut stdout, 10, y_size - clock_size.height() - 4)?;
         } else {
             forbidden = HashSet::new();
         }

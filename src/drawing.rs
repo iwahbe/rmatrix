@@ -300,7 +300,7 @@ impl Numbers {
             h = size.height;
         }
         self.digits = new.to_owned();
-        self.size.width = w + new.len() as u16 - 2;
+        self.size.width = w + new.len() as u16;
         self.size.height = h - 1;
     }
 }
@@ -311,6 +311,11 @@ pub struct Size {
     width: u16,
 }
 
+impl Size {
+    pub fn height(&self) -> u16 { self.height }
+    pub fn width(&self) -> u16 { self.width }
+}
+
 pub trait Draw {
     fn size(&self) -> Size;
     fn draw(&self, writer: &mut dyn Write, x: u16, y: u16) -> std::io::Result<HashSet<(u16, u16)>>;
@@ -319,8 +324,14 @@ pub trait Draw {
 impl Draw for Numbers {
     fn size(&self) -> Size { self.size }
     fn draw(&self, writer: &mut dyn Write, x: u16, y: u16) -> std::io::Result<HashSet<(u16, u16)>> {
+        let mut taken = HashSet::new();
         for row in 0..(Digit::one().0).0.len() {
             write!(writer, "{}", cursor::Goto(x, y + row as u16))?;
+            let mut index = 0;
+            // for better padding
+            write!(writer, " ")?;
+            taken.insert((x + index, y + row as u16));
+            index += 1;
             for digit in self.digits.char_indices() {
                 let chrs = (match digit.1 {
                     '1' => Digit::one(),
@@ -342,13 +353,18 @@ impl Draw for Numbers {
                 }
                 .0)
                     .0[row];
-                write!(writer, "{}", chrs)?;
-                if digit.0 != self.digits.len() - 1 {
-                    write!(writer, " ")?;
+                for _ in 0..chrs.len() {
+                    taken.insert((x + index, y + row as u16));
+                    index += 1;
                 }
+                write!(writer, "{}", chrs)?;
+
+                write!(writer, " ")?;
+                taken.insert((x + index, y + row as u16));
+                index += 1;
             }
         }
-        Ok(HashSet::new())
+        Ok(taken)
     }
 }
 
@@ -366,10 +382,12 @@ impl Draw for Frame {
         }
     }
     fn draw(&self, writer: &mut dyn Write, x: u16, y: u16) -> std::io::Result<HashSet<(u16, u16)>> {
-        write!(writer, "{}", cursor::Goto(x, y))?;
+        let mut taken = HashSet::new();
         let size = self.size();
-        for _ in 0..size.width - 2 {
+        write!(writer, "{}", cursor::Goto(x, y))?;
+        for i in 0..size.width - 2 {
             write!(writer, "{}", self.material)?;
+            taken.insert((x + i, y));
         }
         for y0 in y..y + size.height {
             write!(
@@ -379,18 +397,15 @@ impl Draw for Frame {
                 g2 = cursor::Goto(x + size.width - 2, y0),
                 m = self.material
             )?;
+            taken.insert((x, y0));
+            taken.insert((x + size.width - 2, y0));
         }
         write!(writer, "{}", cursor::Goto(x, y + size.height))?;
-        for _ in 0..self.size().width - 1 {
+        for i in 0..self.size().width - 1 {
             write!(writer, "{}", self.material)?;
+            taken.insert((x + i, y + size.height));
         }
         let inner_hitbox = self.inner.draw(writer, x + 1, y + 1)?;
-        let mut taken = HashSet::new();
-        for xdelta in 0..size.width - 2 {
-            for ydelta in 0..size.height + 2 {
-                taken.insert((x + xdelta, y + ydelta - 1));
-            }
-        }
         taken.extend(inner_hitbox);
         Ok(taken)
     }
