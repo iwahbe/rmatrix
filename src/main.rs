@@ -1,10 +1,13 @@
+extern crate chrono;
 extern crate clap;
 extern crate rand;
 extern crate termion;
+use chrono::Local;
 mod numbers;
 use clap::{App, Arg};
 use numbers::{Draw, Frame, Numbers};
 use rand::{distributions::Uniform, prelude::*};
+use std::collections::HashSet;
 use std::io::{stdout, Write};
 use std::{thread, time};
 use termion::event::Key;
@@ -127,6 +130,14 @@ fn hot_loop(
     is_clock: bool,
 ) -> std::io::Result<ExitReason> {
     let (x_size, y_size) = termion::terminal_size()?;
+    let mut forbidden = (|| {
+        let mut out = HashSet::new();
+        for x in vec![(5, 5), (5, 6), (6, 5), (6, 6)].into_iter() {
+            out.insert(x);
+        }
+        out
+    })();
+    forbidden.insert((5, 5));
     write!(stdout, "{}{}", cursor::Hide, clear::All)?;
     let mut columns: Vec<Column> = if !horizontal {
         1..x_size
@@ -140,15 +151,17 @@ fn hot_loop(
             if !horizontal { y_size } else { x_size },
             reverse,
             horizontal,
+            &forbidden,
         )
     })
     .collect();
-    let clock;
+    let mut clock;
     if is_clock {
-        clock = Some(Frame::from(
-            '#',
-            Box::new(Frame::from(' ', Box::new(Numbers::from("4:20AM")))),
-        ));
+        let raw_clock = Box::new(Numbers::from(&format!(
+            "{}",
+            Local::now().format("%I:%M%p")
+        )));
+        clock = Some(Frame::from('#', Box::new(Frame::from(' ', raw_clock))));
     } else {
         clock = None;
     }
@@ -165,20 +178,30 @@ fn hot_loop(
                 _ => {}
             }
         }
-        stdout.flush()?;
         for c in &mut columns {
             c.update(&mut stdout, main_color, second_color)?;
         }
-        if let Some(c) = clock.as_ref() {
+        if let Some(c) = clock {
             c.draw(&mut stdout, 3, 2)?;
+            clock = Some(Frame::from(
+                '#',
+                Box::new(Frame::from(
+                    ' ',
+                    Box::new(Numbers::from(&format!(
+                        "{}",
+                        Local::now().format("%I:%M%p")
+                    ))),
+                )),
+            ));
         }
+        stdout.flush()?;
         thread::sleep(time::Duration::from_secs_f32(
             if horizontal { 0.5 } else { 1.0 } * 0.05,
         ));
     }
 }
 
-struct Column {
+struct Column<'a> {
     start: u16,
     end: u16,
     max_height: u16,
@@ -187,10 +210,17 @@ struct Column {
     delay: u16,
     reverse: bool,
     horizontal: bool,
+    forbidden: &'a HashSet<(u16, u16)>,
 }
 
-impl Column {
-    fn new(column: u16, max_height: u16, rev: bool, horizontal: bool) -> Self {
+impl<'a> Column<'a> {
+    fn new(
+        column: u16,
+        max_height: u16,
+        rev: bool,
+        horizontal: bool,
+        forbidden: &'a HashSet<(u16, u16)>,
+    ) -> Self {
         Self {
             start: if !rev {
                 0 + horizontal as u16
@@ -209,6 +239,7 @@ impl Column {
                 .sample(&mut rand::thread_rng()),
             reverse: rev,
             horizontal: horizontal,
+            forbidden: forbidden,
         }
     }
     fn update<T: Write>(
@@ -259,16 +290,20 @@ impl Column {
 
     fn delete_first_char<T: Write>(&mut self, writer: &mut T) -> std::io::Result<()> {
         // delete last char created
-        write!(
-            writer,
-            "{goto}{space}",
-            goto = if !self.horizontal {
-                cursor::Goto(self.column, self.start)
-            } else {
-                cursor::Goto(self.start, self.column)
-            },
-            space = " "
-        )?;
+        let pair = if !self.horizontal {
+            (self.column, self.start)
+        } else {
+            (self.start, self.column)
+        };
+        if self.forbidden.contains(&pair) {
+        } else {
+            write!(
+                writer,
+                "{goto}{space}",
+                goto = cursor::Goto(pair.0, pair.1),
+                space = " "
+            )?;
+        }
         if !self.reverse {
             self.start += 1;
         } else {
@@ -279,29 +314,29 @@ impl Column {
 
     fn delete_last_char<T: Write>(&mut self, writer: &mut T) -> std::io::Result<()> {
         let lowest = if self.horizontal { 1 } else { 0 };
-        write!(
-            writer,
-            "{goto} ",
-            goto = if !self.horizontal {
-                cursor::Goto(
-                    self.column,
-                    if !self.reverse {
-                        self.max_height
-                    } else {
-                        lowest
-                    },
-                )
-            } else {
-                cursor::Goto(
-                    if !self.reverse {
-                        self.max_height
-                    } else {
-                        lowest
-                    },
-                    self.column,
-                )
-            },
-        )?;
+        let pair = if !self.horizontal {
+            (
+                self.column,
+                if !self.reverse {
+                    self.max_height
+                } else {
+                    lowest
+                },
+            )
+        } else {
+            (
+                if !self.reverse {
+                    self.max_height
+                } else {
+                    lowest
+                },
+                self.column,
+            )
+        };
+        if self.forbidden.contains(&pair) {
+        } else {
+            write!(writer, "{goto} ", goto = cursor::Goto(pair.0, pair.1))?;
+        }
         Ok(())
     }
 
@@ -318,20 +353,24 @@ impl Column {
         } else {
             self.end -= 1;
         };
-        // create new char at end
-        self.last_made = random_char();
-        write!(
-            writer,
-            "{color}{goto}{rand}{reset}",
-            color = color::Fg(c2),
-            goto = if !self.horizontal {
-                cursor::Goto(self.column, self.end)
-            } else {
-                cursor::Goto(self.end, self.column)
-            },
-            rand = self.last_made,
-            reset = color::Fg(color::Reset),
-        )?;
+        let pair = if !self.horizontal {
+            (self.column, self.end)
+        } else {
+            (self.end, self.column)
+        };
+        if self.forbidden.contains(&pair) {
+        } else {
+            // create new char at end
+            self.last_made = random_char();
+            write!(
+                writer,
+                "{color}{goto}{rand}{reset}",
+                color = color::Fg(c2),
+                goto = cursor::Goto(pair.0, pair.1),
+                rand = self.last_made,
+                reset = color::Fg(color::Reset),
+            )?;
+        }
         Ok(())
     }
 
@@ -340,18 +379,22 @@ impl Column {
         writer: &mut T,
         c1: &dyn color::Color,
     ) -> std::io::Result<()> {
-        write!(
-            writer,
-            "{color}{goto}{c}{reset}",
-            color = color::Fg(c1),
-            goto = if !self.horizontal {
-                cursor::Goto(self.column, self.end)
-            } else {
-                cursor::Goto(self.end, self.column)
-            },
-            c = self.last_made,
-            reset = color::Fg(color::Reset),
-        )?;
+        let pair = if !self.horizontal {
+            (self.column, self.end)
+        } else {
+            (self.end, self.column)
+        };
+        if self.forbidden.contains(&pair) {
+        } else {
+            write!(
+                writer,
+                "{color}{goto}{c}{reset}",
+                color = color::Fg(c1),
+                goto = cursor::Goto(pair.0, pair.1),
+                c = self.last_made,
+                reset = color::Fg(color::Reset),
+            )?;
+        }
         Ok(())
     }
 }

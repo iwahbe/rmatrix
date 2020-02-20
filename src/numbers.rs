@@ -3,6 +3,7 @@ use std::io::Write;
 use termion::cursor;
 
 impl Digit {
+    // Colossal font: "https://onlineasciitools.com/convert-text-to-ascii-art"
     fn one() -> (Self, Size) {
         (
             Self(vec![
@@ -18,7 +19,7 @@ impl Digit {
     fn two() -> (Self, Size) {
         (
             Self(vec![
-                " .d8888b. ",
+                " .d8888b.  ",
                 "d88P  Y88b ",
                 "       888 ",
                 "     .d88P ",
@@ -162,14 +163,14 @@ impl Digit {
     fn zero() -> (Self, Size) {
         (
             Self(vec![
-                " .d8888b.  ",
-                "d88P  Y88b ",
-                "888    888 ",
-                "888    888 ",
-                "888    888 ",
-                "888    888 ",
-                "Y88b  d88P ",
-                " \"Y8888P\"  ",
+                " .d8888b. ",
+                "d88P  Y88b",
+                "888    888",
+                "888    888",
+                "888    888",
+                "888    888",
+                "Y88b  d88P",
+                " \"Y8888P\" ",
             ]),
             Size {
                 height: 8,
@@ -258,9 +259,23 @@ pub struct Numbers {
 
 impl Numbers {
     pub fn from(digits: &str) -> Self {
+        let mut out = Self::new();
+        out.update(digits);
+        out
+    }
+    fn new() -> Self {
+        Self {
+            digits: String::new(),
+            size: Size {
+                height: 0,
+                width: 0,
+            },
+        }
+    }
+    fn update(&mut self, new: &str) {
         let mut w = 0;
         let mut h = 0;
-        for digit in digits.chars() {
+        for digit in new.chars() {
             let size = match digit {
                 '1' => Digit::one(),
                 '2' => Digit::two(),
@@ -283,13 +298,9 @@ impl Numbers {
             w += size.width;
             h = size.height;
         }
-        Self {
-            digits: digits.to_owned(),
-            size: Size {
-                height: h - 1,
-                width: w + digits.len() as u16 - 2,
-            },
-        }
+        self.digits = new.to_owned();
+        self.size.width = w + new.len() as u16 - 2;
+        self.size.height = h - 1;
     }
 }
 
@@ -310,30 +321,27 @@ impl Draw for Numbers {
         for row in 0..(Digit::one().0).0.len() {
             write!(writer, "{}", cursor::Goto(x, y + row as u16))?;
             for digit in self.digits.char_indices() {
-                write!(
-                    writer,
-                    "{}",
-                    (match digit.1 {
-                        '1' => Digit::one(),
-                        '2' => Digit::two(),
-                        '3' => Digit::three(),
-                        '4' => Digit::four(),
-                        '5' => Digit::five(),
-                        '6' => Digit::six(),
-                        '7' => Digit::seven(),
-                        '8' => Digit::eight(),
-                        '9' => Digit::nine(),
-                        '0' => Digit::zero(),
-                        ':' => Digit::colon(),
-                        'P' => Digit::p(),
-                        'A' => Digit::a(),
-                        'M' => Digit::m(),
-                        ' ' => Digit::space(),
-                        _ => panic!("Bad Number input"),
-                    }
-                    .0)
-                        .0[row],
-                )?;
+                let chrs = (match digit.1 {
+                    '1' => Digit::one(),
+                    '2' => Digit::two(),
+                    '3' => Digit::three(),
+                    '4' => Digit::four(),
+                    '5' => Digit::five(),
+                    '6' => Digit::six(),
+                    '7' => Digit::seven(),
+                    '8' => Digit::eight(),
+                    '9' => Digit::nine(),
+                    '0' => Digit::zero(),
+                    ':' => Digit::colon(),
+                    'P' => Digit::p(),
+                    'A' => Digit::a(),
+                    'M' => Digit::m(),
+                    ' ' => Digit::space(),
+                    _ => panic!("Bad Number input"),
+                }
+                .0)
+                    .0[row];
+                write!(writer, "{}", chrs)?;
                 if digit.0 != self.digits.len() - 1 {
                     write!(writer, " ")?;
                 }
