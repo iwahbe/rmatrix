@@ -1,257 +1,9 @@
-struct Digit(Vec<&'static str>);
 use std::collections::HashSet;
 use std::io::Write;
 use termion::cursor;
 
-impl Digit {
-    // Colossal font: "https://onlineasciitools.com/convert-text-to-ascii-art"
-    fn one() -> (Self, Size) {
-        (
-            Self(vec![
-                " d888  ", "d8888  ", "  888  ", "  888  ", "  888  ", "  888  ", "  888  ",
-                "8888888",
-            ]),
-            Size {
-                height: 8,
-                width: 8,
-            },
-        )
-    }
-    fn two() -> (Self, Size) {
-        (
-            Self(vec![
-                " .d8888b.  ",
-                "d88P  Y88b ",
-                "       888 ",
-                "     .d88P ",
-                " .od888P\"  ",
-                "d88P\"      ",
-                "888\"       ",
-                "888888888  ",
-            ]),
-            Size {
-                height: 8,
-                width: 11,
-            },
-        )
-    }
-    fn three() -> (Self, Size) {
-        (
-            Self(vec![
-                " .d8888b. ",
-                "d88P  Y88b",
-                "     .d88P",
-                "    8888\" ",
-                "     \"Y8b.",
-                "888    888",
-                "Y88b  d88P",
-                " \"Y8888P\" ",
-            ]),
-            Size {
-                height: 8,
-                width: 10,
-            },
-        )
-    }
-    fn four() -> (Self, Size) {
-        (
-            Self(vec![
-                "    d8888 ",
-                "   d8P888 ",
-                "  d8P 888 ",
-                " d8P  888 ",
-                "d88   888 ",
-                "8888888888",
-                "      888 ",
-                "      888 ",
-            ]),
-            Size {
-                height: 8,
-                width: 10,
-            },
-        )
-    }
-    fn five() -> (Self, Size) {
-        (
-            Self(vec![
-                "888888888 ",
-                "888       ",
-                "888       ",
-                "8888888b. ",
-                "     \"Y88b",
-                "       888",
-                "Y88b  d88P",
-                " \"Y8888P\" ",
-            ]),
-            Size {
-                height: 8,
-                width: 10,
-            },
-        )
-    }
-    fn six() -> (Self, Size) {
-        (
-            Self(vec![
-                " .d8888b. ",
-                "d88P  Y88b",
-                "888       ",
-                "888d888b. ",
-                "888P \"Y88b",
-                "888    888",
-                "Y88b  d88P",
-                " \"Y8888P\" ",
-            ]),
-            Size {
-                height: 8,
-                width: 10,
-            },
-        )
-    }
-    fn seven() -> (Self, Size) {
-        (
-            Self(vec![
-                "8888888888",
-                "      d88P",
-                "     d88P ",
-                "    d88P  ",
-                " 88888888 ",
-                "  d88P    ",
-                " d88P     ",
-                "d88P      ",
-            ]),
-            Size {
-                height: 8,
-                width: 10,
-            },
-        )
-    }
-    fn eight() -> (Self, Size) {
-        (
-            Self(vec![
-                " .d8888b.  ",
-                "d88P  Y88b ",
-                "Y88b. d88P ",
-                " \"Y88888\"  ",
-                ".d8P\"\"Y8b. ",
-                "888    888 ",
-                "Y88b  d88P ",
-                " \"Y8888P\"  ",
-            ]),
-            Size {
-                height: 8,
-                width: 11,
-            },
-        )
-    }
-    fn nine() -> (Self, Size) {
-        (
-            Self(vec![
-                " .d8888b. ",
-                "d88P  Y88b",
-                "888    888",
-                "Y88b. d888",
-                " \"Y888P888",
-                "       888",
-                "Y88b  d88P",
-                " \"Y8888P\" ",
-            ]),
-            Size {
-                height: 8,
-                width: 10,
-            },
-        )
-    }
-    fn zero() -> (Self, Size) {
-        (
-            Self(vec![
-                " .d8888b. ",
-                "d88P  Y88b",
-                "888    888",
-                "888    888",
-                "888    888",
-                "888    888",
-                "Y88b  d88P",
-                " \"Y8888P\" ",
-            ]),
-            Size {
-                height: 8,
-                width: 11,
-            },
-        )
-    }
-    fn colon() -> (Self, Size) {
-        (
-            Self(vec!["   ", "d8b", "Y8P", "   ", "   ", "d8b", "Y8P", "   "]),
-            Size {
-                height: 8,
-                width: 3,
-            },
-        )
-    }
-    fn a() -> (Self, Size) {
-        (
-            Self(vec![
-                "       d8888",
-                "      d88888",
-                "     d88P888",
-                "    d88P 888",
-                "   d88P  888",
-                "  d88P   888",
-                " d8888888888",
-                "d88P     888",
-            ]),
-            Size {
-                height: 8,
-                width: 12,
-            },
-        )
-    }
-    fn p() -> (Self, Size) {
-        (
-            Self(vec![
-                "8888888b. ",
-                "888   Y88b",
-                "888    888",
-                "888   d88P",
-                "8888888P\" ",
-                "888       ",
-                "888       ",
-                "888       ",
-            ]),
-            Size {
-                height: 8,
-                width: 10,
-            },
-        )
-    }
-    fn m() -> (Self, Size) {
-        (
-            Self(vec![
-                "888b     d888",
-                "8888b   d8888",
-                "88888b.d88888",
-                "888Y88888P888",
-                "888 Y888P 888",
-                "888  Y8P  888",
-                "888   \"   888",
-                "888       888",
-            ]),
-            Size {
-                height: 8,
-                width: 13,
-            },
-        )
-    }
-    fn space() -> (Self, Size) {
-        (
-            Self(vec!["  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "]),
-            Size {
-                height: 8,
-                width: 2,
-            },
-        )
-    }
-}
+type Digit = fonts::Doom;
+use fonts::Font;
 
 pub struct Numbers {
     digits: String,
@@ -301,7 +53,7 @@ impl Numbers {
                 ' ' => Digit::space(),
                 _ => panic!("Bad Numbers input"),
             }
-            .1;
+            .0;
             w += size.width;
             h = size.height;
         }
@@ -320,6 +72,12 @@ pub struct Size {
 impl Size {
     pub fn height(&self) -> u16 { self.height }
     pub fn width(&self) -> u16 { self.width }
+    fn from(h: u16, w: u16) -> Self {
+        Self {
+            height: h,
+            width: w,
+        }
+    }
 }
 
 pub trait Draw {
@@ -331,7 +89,7 @@ impl Draw for Numbers {
     fn size(&self) -> Size { self.size }
     fn draw(&self, writer: &mut dyn Write, x: u16, y: u16) -> std::io::Result<HashSet<(u16, u16)>> {
         let mut taken = HashSet::new();
-        for row in 0..(Digit::one().0).0.len() {
+        for row in 0..(Digit::one().1).inner().len() {
             write!(writer, "{}", cursor::Goto(x, y + row as u16))?;
             let mut index = 0;
             // for better padding
@@ -357,8 +115,8 @@ impl Draw for Numbers {
                     ' ' => Digit::space(),
                     _ => panic!("Bad Number input"),
                 }
-                .0)
-                    .0[row];
+                .1)
+                    .inner()[row];
                 for _ in 0..chrs.len() {
                     taken.insert((x + index, y + row as u16));
                     index += 1;
@@ -508,5 +266,408 @@ impl Draw for Blank {
             }
         }
         Ok(dense_hitbox(x, self.size.width(), y, self.size.height()))
+    }
+}
+
+mod fonts {
+    use super::Size;
+    pub struct Doom(Vec<&'static str>);
+    impl Font for Doom {
+        fn inner(&self) -> &Vec<&'static str> { &self.0 }
+        fn one() -> (Size, Self) {
+            (
+                Size::from(6, 6),
+                Self(vec![
+                    r" __  ", r"/  | ", r"`| | ", r" | | ", r"_| |_", r"\___/",
+                ]),
+            )
+        }
+        fn two() -> (Size, Self) {
+            (
+                Size::from(6, 7),
+                Self(vec![
+                    r" _____ ", r"/ __  \", r"`' / /'", r"  / /  ", r"./ /___", r"\_____/",
+                ]),
+            )
+        }
+        fn three() -> (Size, Self) {
+            (
+                Size::from(6, 7),
+                Self(vec![
+                    r" _____ ", r"|____ |", r"    / /", r"    \ \", r".___/ /", r"\____/ ",
+                ]),
+            )
+        }
+        fn four() -> (Size, Self) {
+            (
+                Size::from(6, 7),
+                Self(vec![
+                    r"   ___ ", r"  /   |", r" / /| |", r"/ /_| |", r"\___  |", r"    |_/",
+                ]),
+            )
+        }
+        fn five() -> (Size, Self) {
+            (
+                Size::from(6, 7),
+                Self(vec![
+                    r" _____ ", r"|  ___|", r"|___ \ ", r"    \ \", r"/\__/ /", r"\____/ ",
+                ]),
+            )
+        }
+        fn six() -> (Size, Self) {
+            (
+                Size::from(6, 7),
+                Self(vec![
+                    r"  ____ ", r" / ___|", r"/ /___ ", r"| ___ \", r"| \_/ |", r"\_____/",
+                ]),
+            )
+        }
+        fn seven() -> (Size, Self) {
+            (
+                Size::from(6, 7),
+                Self(vec![
+                    r" ______", r"|___  /", r"   / / ", r"  / /  ", r"./ /   ", r"\_/    ",
+                ]),
+            )
+        }
+        fn eight() -> (Size, Self) {
+            (
+                Size::from(6, 7),
+                Self(vec![
+                    r" _____ ", r"|  _  |", r" \ V / ", r" / _ \ ", r"| |_| |", r"\_____/",
+                ]),
+            )
+        }
+        fn nine() -> (Size, Self) {
+            (
+                Size::from(6, 6),
+                Self(vec![
+                    r" _____ ", r"|  _  |", r"| |_| |", r"\____ |", r".___/ /", r"\____/ ",
+                ]),
+            )
+        }
+        fn zero() -> (Size, Self) {
+            (
+                Size::from(6, 7),
+                Self(vec![
+                    r" _____ ", r"|  _  |", r"| |/' |", r"|  /| |", r"\ |_/ /", r" \___/ ",
+                ]),
+            )
+        }
+        fn colon() -> (Size, Self) {
+            (
+                Size::from(6, 3),
+                Self(vec![r"   ", r" _ ", r"(_)", r"   ", r" _ ", r"(_)"]),
+            )
+        }
+        fn a() -> (Size, Self) {
+            (
+                Size::from(6, 7),
+                Self(vec![
+                    r"  ___  ", r" / _ \ ", r"/ /_\ \", r"|  _  |", r"| | | |", r"\_| |_/",
+                ]),
+            )
+        }
+        fn p() -> (Size, Self) {
+            (
+                Size::from(6, 8),
+                Self(vec![
+                    r"______ ", r"| ___ \", r"| |_/ /", r"|  __/ ", r"| |    ", r"\_|    ",
+                ]),
+            )
+        }
+        fn m() -> (Size, Self) {
+            (
+                Size::from(6, 8),
+                Self(vec![
+                    r"___  ___",
+                    r"|  \/  |",
+                    r"| .  . |",
+                    r"| |\/| |",
+                    r"| |  | |",
+                    r"\_|  |_/",
+                ]),
+            )
+        }
+        fn space() -> (Size, Self) {
+            (
+                Size::from(6, 1),
+                Self(vec![r" ", r" ", r" ", r" ", r" ", r" "]),
+            )
+        }
+        fn clock_size(&self) -> u16 { 0 }
+    }
+
+    pub trait Font {
+        fn one() -> (Size, Self);
+        fn two() -> (Size, Self);
+        fn three() -> (Size, Self);
+        fn four() -> (Size, Self);
+        fn five() -> (Size, Self);
+        fn six() -> (Size, Self);
+        fn seven() -> (Size, Self);
+        fn eight() -> (Size, Self);
+        fn nine() -> (Size, Self);
+        fn zero() -> (Size, Self);
+        fn a() -> (Size, Self);
+        fn p() -> (Size, Self);
+        fn m() -> (Size, Self);
+        fn colon() -> (Size, Self);
+        fn space() -> (Size, Self);
+        fn inner(&self) -> &Vec<&'static str>;
+        fn clock_size(&self) -> u16;
+    }
+
+    pub struct Colossal(Vec<&'static str>);
+    impl Font for Colossal {
+        fn inner(&self) -> &Vec<&'static str> { &self.0 }
+        fn clock_size(&self) -> u16 { 104 }
+        // Colossal font: "https://onlineasciitools.com/convert-text-to-ascii-art"
+        fn one() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 8,
+                },
+                Self(vec![
+                    " d888  ", "d8888  ", "  888  ", "  888  ", "  888  ", "  888  ", "  888  ",
+                    "8888888",
+                ]),
+            )
+        }
+        fn two() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 11,
+                },
+                Self(vec![
+                    " .d8888b.  ",
+                    "d88P  Y88b ",
+                    "       888 ",
+                    "     .d88P ",
+                    " .od888P\"  ",
+                    "d88P\"      ",
+                    "888\"       ",
+                    "888888888  ",
+                ]),
+            )
+        }
+        fn three() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 10,
+                },
+                Self(vec![
+                    " .d8888b. ",
+                    "d88P  Y88b",
+                    "     .d88P",
+                    "    8888\" ",
+                    "     \"Y8b.",
+                    "888    888",
+                    "Y88b  d88P",
+                    " \"Y8888P\" ",
+                ]),
+            )
+        }
+        fn four() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 10,
+                },
+                Self(vec![
+                    "    d8888 ",
+                    "   d8P888 ",
+                    "  d8P 888 ",
+                    " d8P  888 ",
+                    "d88   888 ",
+                    "8888888888",
+                    "      888 ",
+                    "      888 ",
+                ]),
+            )
+        }
+        fn five() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 10,
+                },
+                Self(vec![
+                    "888888888 ",
+                    "888       ",
+                    "888       ",
+                    "8888888b. ",
+                    "     \"Y88b",
+                    "       888",
+                    "Y88b  d88P",
+                    " \"Y8888P\" ",
+                ]),
+            )
+        }
+        fn six() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 10,
+                },
+                Self(vec![
+                    " .d8888b. ",
+                    "d88P  Y88b",
+                    "888       ",
+                    "888d888b. ",
+                    "888P \"Y88b",
+                    "888    888",
+                    "Y88b  d88P",
+                    " \"Y8888P\" ",
+                ]),
+            )
+        }
+        fn seven() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 10,
+                },
+                Self(vec![
+                    "8888888888",
+                    "      d88P",
+                    "     d88P ",
+                    "    d88P  ",
+                    " 88888888 ",
+                    "  d88P    ",
+                    " d88P     ",
+                    "d88P      ",
+                ]),
+            )
+        }
+        fn eight() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 11,
+                },
+                Self(vec![
+                    " .d8888b.  ",
+                    "d88P  Y88b ",
+                    "Y88b. d88P ",
+                    " \"Y88888\"  ",
+                    ".d8P\"\"Y8b. ",
+                    "888    888 ",
+                    "Y88b  d88P ",
+                    " \"Y8888P\"  ",
+                ]),
+            )
+        }
+        fn nine() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 10,
+                },
+                Self(vec![
+                    " .d8888b. ",
+                    "d88P  Y88b",
+                    "888    888",
+                    "Y88b. d888",
+                    " \"Y888P888",
+                    "       888",
+                    "Y88b  d88P",
+                    " \"Y8888P\" ",
+                ]),
+            )
+        }
+        fn zero() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 11,
+                },
+                Self(vec![
+                    " .d8888b. ",
+                    "d88P  Y88b",
+                    "888    888",
+                    "888    888",
+                    "888    888",
+                    "888    888",
+                    "Y88b  d88P",
+                    " \"Y8888P\" ",
+                ]),
+            )
+        }
+        fn colon() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 3,
+                },
+                Self(vec!["   ", "d8b", "Y8P", "   ", "   ", "d8b", "Y8P", "   "]),
+            )
+        }
+        fn a() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 12,
+                },
+                Self(vec![
+                    "       d8888",
+                    "      d88888",
+                    "     d88P888",
+                    "    d88P 888",
+                    "   d88P  888",
+                    "  d88P   888",
+                    " d8888888888",
+                    "d88P     888",
+                ]),
+            )
+        }
+        fn p() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 10,
+                },
+                Self(vec![
+                    "8888888b. ",
+                    "888   Y88b",
+                    "888    888",
+                    "888   d88P",
+                    "8888888P\" ",
+                    "888       ",
+                    "888       ",
+                    "888       ",
+                ]),
+            )
+        }
+        fn m() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 13,
+                },
+                Self(vec![
+                    "888b     d888",
+                    "8888b   d8888",
+                    "88888b.d88888",
+                    "888Y88888P888",
+                    "888 Y888P 888",
+                    "888  Y8P  888",
+                    "888   \"   888",
+                    "888       888",
+                ]),
+            )
+        }
+        fn space() -> (Size, Self) {
+            (
+                Size {
+                    height: 8,
+                    width: 2,
+                },
+                Self(vec!["  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "]),
+            )
+        }
     }
 }

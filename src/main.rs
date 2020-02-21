@@ -15,6 +15,10 @@ use termion::raw::IntoRawMode;
 use termion::{async_stdin, input::TermRead};
 use termion::{clear, color, cursor};
 
+// for Colossal: 104
+// for Doom: 75
+const LENGTH_OF_CLOCK: u16 = 75;
+
 fn main() -> std::io::Result<()> {
     static COLORS_AVAILABLE: &str = "Colors available: red, green, blue, yellow, magenta";
 
@@ -176,7 +180,6 @@ fn hot_loop(
         }
         let mut forbidden = HashSet::new();
         if clock {
-            const LENGTH_OF_CLOCK: u16 = 103;
             let t = format!("{}", Local::now().format("%I:%M:%S%p"));
             let now_clock = Frame::from(
                 '#',
