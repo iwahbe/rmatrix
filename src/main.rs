@@ -15,8 +15,6 @@ use termion::raw::IntoRawMode;
 use termion::{async_stdin, input::TermRead};
 use termion::{clear, color, cursor};
 
-// for Colossal: 104
-// for Doom: 75
 const LENGTH_OF_CLOCK: u16 = 75;
 
 fn main() -> std::io::Result<()> {
@@ -67,7 +65,7 @@ fn main() -> std::io::Result<()> {
             Arg::with_name("fortune")
                 .long("fortune")
                 .short("f")
-                .help("Displays fortune quotes"),
+                .help("Displays fortune quotes (needs fortune in $PATH)"),
         )
         .get_matches();
     // variable setup

@@ -270,7 +270,28 @@ impl Draw for Blank {
 }
 
 mod fonts {
+
     use super::Size;
+    pub trait Font {
+        fn one() -> (Size, Self);
+        fn two() -> (Size, Self);
+        fn three() -> (Size, Self);
+        fn four() -> (Size, Self);
+        fn five() -> (Size, Self);
+        fn six() -> (Size, Self);
+        fn seven() -> (Size, Self);
+        fn eight() -> (Size, Self);
+        fn nine() -> (Size, Self);
+        fn zero() -> (Size, Self);
+        fn a() -> (Size, Self);
+        fn p() -> (Size, Self);
+        fn m() -> (Size, Self);
+        fn colon() -> (Size, Self);
+        fn space() -> (Size, Self);
+        fn inner(&self) -> &Vec<&'static str>;
+        fn clock_size(&self) -> u16;
+    }
+
     pub struct Doom(Vec<&'static str>);
     impl Font for Doom {
         fn inner(&self) -> &Vec<&'static str> { &self.0 }
@@ -395,27 +416,7 @@ mod fonts {
                 Self(vec![r" ", r" ", r" ", r" ", r" ", r" "]),
             )
         }
-        fn clock_size(&self) -> u16 { 0 }
-    }
-
-    pub trait Font {
-        fn one() -> (Size, Self);
-        fn two() -> (Size, Self);
-        fn three() -> (Size, Self);
-        fn four() -> (Size, Self);
-        fn five() -> (Size, Self);
-        fn six() -> (Size, Self);
-        fn seven() -> (Size, Self);
-        fn eight() -> (Size, Self);
-        fn nine() -> (Size, Self);
-        fn zero() -> (Size, Self);
-        fn a() -> (Size, Self);
-        fn p() -> (Size, Self);
-        fn m() -> (Size, Self);
-        fn colon() -> (Size, Self);
-        fn space() -> (Size, Self);
-        fn inner(&self) -> &Vec<&'static str>;
-        fn clock_size(&self) -> u16;
+        fn clock_size(&self) -> u16 { 75 }
     }
 
     pub struct Colossal(Vec<&'static str>);
